@@ -1,0 +1,461 @@
+File: shell.py
+----------------------------------------
+import os
+import subprocess
+import socket
+import getpass
+import inspect
+import sys
+
+from colors import GREEN, BLUE, YELLOW, RED, CYAN, RESET, BOLD
+from registry import get_command
+from system import clear_screen
+
+# History tracking
+command_history = []
+
+def run_system_command(command_str):
+    """Run non-built-in command using the system shell."""
+    try:
+        completed = subprocess.run(command_str, shell=True)
+    except Exception as exc:
+        print(f"{RED}Error while executing command: {exc}{RESET}")
+
+
+def handle_command(command_str):
+    """Route command to built-ins or external execution."""
+    parts = command_str.split()
+    if not parts:
+        return
+
+    cmd_name = parts[0]
+    func = get_command(cmd_name)
+
+    if func:
+        # Check if function takes args
+        sig = inspect.signature(func)
+        if len(sig.parameters) > 0:
+            func(parts)
+        else:
+            func()
+    elif cmd_name.lower() == "history":
+        for i, h in enumerate(command_history, 1):
+            print(f"  {i}  {h}")
+    else:
+        run_system_command(command_str)
+
+
+def get_prompt():
+    """Construct a dynamic, colorful prompt."""
+    user = getpass.getuser()
+    hostname = socket.gethostname()
+    cwd = os.getcwd()
+    
+    home = os.path.expanduser("~")
+    if cwd.startswith(home):
+        cwd = cwd.replace(home, "~", 1)
+    
+    return f"{GREEN}{user}@{hostname}{RESET}:{BLUE}{cwd}{RESET}$ "
+
+
+def initialize_shell():
+    """Perform startup checks and initialize environment."""
+    print(f"{CYAN}Initializing System...{RESET}")
+    
+    # Check for core modules
+    modules = ["filesystem.py", "system.py", "registry.py", "extra_commands.py", "colors.py"]
+    missing = [m for m in modules if not os.path.exists(m)]
+    
+    if missing:
+        print(f"{RED}Warning: Missing core modules: {', '.join(missing)}{RESET}")
+    else:
+        print(f"{GREEN}Core Modules: OK{RESET}")
+
+    # Check for VENV
+    if hasattr(sys, 'real_prefix') or (target := getattr(sys, 'base_prefix', sys.prefix)) != sys.prefix:
+        print(f"{GREEN}Environment: Virtual (VENV active){RESET}")
+    else:
+        print(f"{YELLOW}Environment: Global (VENV not active){RESET}")
+    
+    # Load history or other state if needed
+    print(f"{GREEN}System Check Complete.{RESET}\n")
+
+
+def run_shell():
+    """Main interactive shell loop."""
+    clear_screen()
+    print(f"{YELLOW}{BOLD}Welcome to Custom Mini Shell v3.1{RESET}")
+    print(f"Type {GREEN}'help'{RESET} to see available commands or {RED}'exit'{RESET} to quit.\n")
+    
+    initialize_shell()
+
+    while True:
+        try:
+            command = input(get_prompt()).strip()
+        except (EOFError, KeyboardInterrupt):
+            print(f"\n{YELLOW}Exiting shell...{RESET}")
+            break
+
+        if not command:
+            continue
+
+        if command.lower() == "exit":
+            print(f"{YELLOW}Goodbye!{RESET}")
+            break
+
+        command_history.append(command)
+        handle_command(command)
+
+
+if __name__ == "__main__":
+    # Enable colors on Windows
+    if os.name == 'nt':
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
+    
+    run_shell()
+
+========================================
+
+File: registry.py
+----------------------------------------
+from filesystem import (
+    change_directory,
+    print_working_directory,
+    list_files,
+    mkdir_command,
+    touch_command,
+    rm_command,
+    cat_command
+)
+from system import (
+    clear_screen,
+    echo_command,
+    whoami_command,
+    print_help
+)
+from extra_commands import (
+    sysinfo_command,
+    calc_command,
+    search_command,
+    notes_command
+)
+
+# Command Registry mapping command strings to functions
+COMMAND_MAP = {
+    "cd": change_directory,
+    "pwd": print_working_directory,
+    "ls": list_files,
+    "clear": clear_screen,
+    "help": print_help,
+    "echo": echo_command,
+    "mkdir": mkdir_command,
+    "touch": touch_command,
+    "rm": rm_command,
+    "cat": cat_command,
+    "whoami": whoami_command,
+    "sysinfo": sysinfo_command,
+    "calc": calc_command,
+    "search": search_command,
+    "notes": notes_command,
+}
+
+def get_command(cmd_name):
+    """Retrieve command function from the registry."""
+    return COMMAND_MAP.get(cmd_name.lower())
+
+========================================
+
+File: filesystem.py
+----------------------------------------
+import os
+import shutil
+from colors import BLUE, GREEN, RED, CYAN, RESET, BOLD
+
+def change_directory(args):
+    """Change current working directory."""
+    if len(args) < 2:
+        target = os.path.expanduser("~")
+    else:
+        target = args[1]
+    
+    try:
+        os.chdir(target)
+    except Exception as exc:
+        print(f"{RED}cd: {exc}{RESET}")
+
+
+def print_working_directory():
+    """Print current working directory."""
+    print(f"{CYAN}{os.getcwd()}{RESET}")
+
+
+def list_files(args):
+    """List files in current directory or optional target directory."""
+    show_all = "-a" in args
+    target = os.getcwd()
+    
+    paths = [a for a in args[1:] if not a.startswith("-")]
+    if paths:
+        target = paths[0]
+
+    try:
+        items = os.listdir(target)
+        if not show_all:
+            items = [i for i in items if not i.startswith(".")]
+        
+        items.sort()
+        
+        for name in items:
+            full_path = os.path.join(target, name)
+            if os.path.isdir(full_path):
+                print(f"{BLUE}{BOLD}{name}/{RESET}")
+            elif os.access(full_path, os.X_OK):
+                print(f"{GREEN}{name}*{RESET}")
+            else:
+                print(name)
+    except Exception as exc:
+        print(f"{RED}ls: {exc}{RESET}")
+
+
+def mkdir_command(args):
+    """Create a new directory."""
+    if len(args) < 2:
+        print(f"{RED}mkdir: missing operand{RESET}")
+        return
+    
+    for folder in args[1:]:
+        try:
+            os.makedirs(folder, exist_ok=True)
+        except Exception as exc:
+            print(f"{RED}mkdir: cannot create directory '{folder}': {exc}{RESET}")
+
+
+def touch_command(args):
+    """Create an empty file or update timestamp."""
+    if len(args) < 2:
+        print(f"{RED}touch: missing file operand{RESET}")
+        return
+    
+    for filename in args[1:]:
+        try:
+            with open(filename, 'a'):
+                os.utime(filename, None)
+        except Exception as exc:
+            print(f"{RED}touch: cannot touch '{filename}': {exc}{RESET}")
+
+
+def rm_command(args):
+    """Remove files or directories."""
+    if len(args) < 2:
+        print(f"{RED}rm: missing operand{RESET}")
+        return
+    
+    recursive = "-r" in args
+    targets = [a for a in args[1:] if not a.startswith("-")]
+    
+    for target in targets:
+        try:
+            if os.path.isdir(target):
+                if recursive:
+                    shutil.rmtree(target)
+                else:
+                    print(f"{RED}rm: cannot remove '{target}': Is a directory (use -r){RESET}")
+            else:
+                os.remove(target)
+        except Exception as exc:
+            print(f"{RED}rm: cannot remove '{target}': {exc}{RESET}")
+
+
+def cat_command(args):
+    """Display file contents."""
+    if len(args) < 2:
+        print(f"{RED}cat: missing file operand{RESET}")
+        return
+    
+    for filename in args[1:]:
+        try:
+            with open(filename, 'r') as f:
+                print(f.read())
+        except Exception as exc:
+            print(f"{RED}cat: {filename}: {exc}{RESET}")
+
+========================================
+
+File: system.py
+----------------------------------------
+import os
+import getpass
+from colors import GREEN, YELLOW, CYAN, RESET, BOLD
+
+def clear_screen():
+    """Clear terminal screen."""
+    os.system("cls" if os.name == "nt" else "clear")
+
+
+def echo_command(args):
+    """Print the arguments to the shell."""
+    print(" ".join(args[1:]))
+
+
+def whoami_command():
+    """Print the current user."""
+    print(getpass.getuser())
+
+
+def print_help():
+    """Display supported commands and examples."""
+    print(f"{YELLOW}{BOLD}Custom Mini Shell - Available Commands:{RESET}")
+    
+    # Standard Commands
+    std_cmds = [
+        ("cd [path]", "Change directory (default: home)"),
+        ("pwd", "Show current directory"),
+        ("ls [-a] [path]", "List files/folders (-a for hidden)"),
+        ("echo [text]", "Print text to terminal"),
+        ("whoami", "Show current user"),
+        ("clear", "Clear terminal screen"),
+        ("exit", "Exit mini shell")
+    ]
+    
+    # Filesystem Commands
+    fs_cmds = [
+        ("mkdir <dir>", "Create one or more directories"),
+        ("touch <file>", "Create empty files"),
+        ("rm [-r] <path>", "Remove files or directories"),
+        ("cat <file>", "Display file contents"),
+    ]
+
+    # Unique/Custom Commands
+    extra_cmds = [
+        ("sysinfo", "Show unique system summary"),
+        ("calc <expr>", "Evaluate math (e.g., calc 10*5)"),
+        ("search <term>", "Search text inside all local files"),
+        ("notes <add/clear>", "Manage persistent shell notes"),
+    ]
+
+    print(f"\n{CYAN}[ Standard ]{RESET}")
+    for cmd, desc in std_cmds:
+        print(f"  {GREEN}{cmd:<15}{RESET} {desc}")
+        
+    print(f"\n{CYAN}[ Filesystem ]{RESET}")
+    for cmd, desc in fs_cmds:
+        print(f"  {GREEN}{cmd:<15}{RESET} {desc}")
+
+    print(f"\n{CYAN}[ Unique / Custom ]{RESET}")
+    for cmd, desc in extra_cmds:
+        print(f"  {GREEN}{cmd:<15}{RESET} {desc}")
+    
+    print(f"\n{YELLOW}System commands are also supported (e.g., git, python).{RESET}")
+
+========================================
+
+File: extra_commands.py
+----------------------------------------
+import os
+import platform
+import datetime
+from colors import GREEN, BLUE, YELLOW, RED, RESET, BOLD, CYAN
+
+def sysinfo_command():
+    """Display unique system information with premium formatting."""
+    print(f"{YELLOW}{BOLD}--- SYSTEM SUMMARY ---{RESET}")
+    print(f"{CYAN}OS:{RESET}        {platform.system()} {platform.release()}")
+    print(f"{CYAN}Node:{RESET}      {platform.node()}")
+    print(f"{CYAN}Processor:{RESET} {platform.processor()}")
+    print(f"{CYAN}Python:{RESET}    {platform.python_version()}")
+    print(f"{CYAN}Time:{RESET}      {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"{YELLOW}{BOLD}----------------------{RESET}")
+
+
+def calc_command(args):
+    """Simple built-in calculator."""
+    if len(args) < 2:
+        print(f"{RED}calc: missing expression (e.g., calc 2+2){RESET}")
+        return
+    
+    expr = "".join(args[1:])
+    try:
+        # Using a restricted eval for safety
+        allowed_chars = "0123456789+-*/(). "
+        if all(c in allowed_chars for c in expr):
+            result = eval(expr)
+            print(f"{GREEN}Result:{RESET} {result}")
+        else:
+            print(f"{RED}calc: invalid characters in expression{RESET}")
+    except Exception as exc:
+        print(f"{RED}calc error: {exc}{RESET}")
+
+
+def search_command(args):
+    """Search for a string in all text files in the current directory."""
+    if len(args) < 2:
+        print(f"{RED}search: missing search term{RESET}")
+        return
+    
+    term = args[1].lower()
+    print(f"{BLUE}Searching for '{term}' (case-insensitive)...{RESET}")
+    
+    found = False
+    for filename in os.listdir("."):
+        if os.path.isfile(filename):
+            try:
+                with open(filename, 'r', encoding='utf-8') as f:
+                    for i, line in enumerate(f, 1):
+                        if term in line.lower():
+                            print(f"{GREEN}{filename}:{i}:{RESET} {line.strip()}")
+                            found = True
+
+            except:
+                continue # Skip binary files or encoding errors
+    
+    if not found:
+        print(f"{YELLOW}No matches found.{RESET}")
+
+
+def notes_command(args):
+    """Simple persistent note-taker."""
+    notes_file = ".shell_notes.txt"
+    
+    if len(args) < 2:
+        # List notes
+        if not os.path.exists(notes_file):
+            print(f"{YELLOW}No notes found.{RESET}")
+        else:
+            print(f"{CYAN}{BOLD}--- YOUR NOTES ---{RESET}")
+            with open(notes_file, 'r') as f:
+                print(f.read().strip())
+            print(f"{CYAN}{BOLD}------------------{RESET}")
+        return
+
+    subcmd = args[1].lower()
+    if subcmd == "add":
+        note = " ".join(args[2:])
+        if not note:
+            print(f"{RED}notes add: missing text{RESET}")
+            return
+        with open(notes_file, 'a') as f:
+            f.write(f"- {note} ({datetime.datetime.now().strftime('%H:%M')})\n")
+        print(f"{GREEN}Note added!{RESET}")
+    elif subcmd == "clear":
+        if os.path.exists(notes_file):
+            os.remove(notes_file)
+            print(f"{GREEN}Notes cleared.{RESET}")
+    else:
+        print(f"{RED}Unknown notes command. Use 'add' or 'clear'.{RESET}")
+
+========================================
+
+File: colors.py
+----------------------------------------
+# ANSI Color codes for terminal UI
+BLUE = "\033[94m"
+GREEN = "\033[92m"
+YELLOW = "\033[93m"
+RED = "\033[91m"
+CYAN = "\033[96m"
+RESET = "\033[0m"
+BOLD = "\033[1m"
+
+========================================
