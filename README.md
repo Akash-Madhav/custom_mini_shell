@@ -1,71 +1,77 @@
-# Custom Mini Shell
+# Custom Mini Shell v3.0
 
-A simple Python-based mini shell for Operating Systems practical work.
+A powerful, modular, and dynamic Python-based mini shell designed for Operating Systems practical work and terminal simulation.
 
-## Objective
+## 🚀 Key Features
+- **Modular Architecture**: Clean separation of concerns (Filesystem, System, Registry, UI).
+- **Dynamic Prompt**: Colorful `user@hostname:path$` prompt with real-time directory updates.
+- **Enhanced Built-ins**: Support for common UNIX-like commands (`ls -a`, `mkdir`, `touch`, `rm -r`, etc.).
+- **Command Registry**: Easily extensible command mapping logic.
+- **Session History**: Track commands run during the current session.
+- **ANSI Color Support**: High-end terminal aesthetics (Blue, Green, Cyan, Red).
 
-Build a terminal-like program that:
-- accepts user commands,
-- executes built-in shell commands,
-- executes system commands,
-- and maintains current working directory state.
+## 📁 Project Structure
+The project is organized into modular files for maximum clarity:
 
-## Project Files
+- `shell.py`: Entry point and main interactive loop.
+- `registry.py`: Centralized command lookup and registration.
+- `filesystem.py`: Core logic for file and directory operations (`ls`, `cd`, `mkdir`, `rm`, `touch`, `cat`).
+- `system.py`: General shell utilities (`clear`, `echo`, `whoami`, `help`).
+- `colors.py`: Terminal color constants for a premium UI experience.
+- `README.md`: Project documentation.
 
-- `shell.py`: Main loop, command parsing, and external command execution.
-- `commands.py`: Built-in command implementations.
-- `README.md`: Documentation and viva explanation points.
+## 🛠️ Built-in Commands
+| Command | Usage | Description |
+| :--- | :--- | :--- |
+| **cd** | `cd [path]` | Change directory (defaults to home). |
+| **pwd** | `pwd` | Show the current working directory. |
+| **ls** | `ls [-a] [path]` | List files/folders (use `-a` for hidden files). |
+| **mkdir** | `mkdir <dir>` | Create one or more directories. |
+| **touch** | `touch <file>` | Create empty files or update timestamps. |
+| **rm** | `rm [-r] <path>` | Remove files or directories (`-r` for recursive). |
+| **cat** | `cat <file>` | Display file contents in the terminal. |
+| **whoami**| `whoami` | Show the current system user. |
+| **echo** | `echo [text]` | Print text to the console. |
+| **history**| `history` | View command history for the current session. |
+| **clear** | `clear` | Clear the terminal screen. |
+| **help**  | `help` | Show this command list. |
+| **exit**  | `exit` | Gracefully exit the shell. |
 
-## Built-in Commands
+*Any non-built-in command (e.g., `git`, `python`, `ipconfig`) is automatically passed to the system shell.*
 
-- `cd <path>`: Change current directory.
-- `pwd`: Print current directory.
-- `ls [path]`: List files/folders.
-- `clear`: Clear terminal screen.
-- `help`: Show command usage.
-- `exit`: Exit the shell.
+## 🐍 Virtual Environment (VENV)
+This project includes a dedicated virtual environment for better dependency management and to keep your global Python installation clean.
 
-Any non-built-in command is executed through the OS (examples: `echo hello`, `dir`, `mkdir test`).
-
-## How To Run
-
-1. Open terminal in this folder.
-2. Run:
-
-```bash
-python shell.py
+### Setup & Activation
+To activate the environment on Windows:
+```powershell
+.\venv\Scripts\activate
 ```
 
-## Demo Script (for viva)
-
-Run these commands in order:
-
-```text
-pwd
-ls
-cd ..
-pwd
-cd invalid_folder
-help
-echo hello
-exit
+To deactivate the environment:
+```powershell
+deactivate
 ```
 
-Expected behavior:
-- Directory changes persist across commands.
-- Invalid paths show clean error messages.
-- External commands run normally.
-- Shell exits only when `exit` is entered.
+*Note: The shell's startup sequence will automatically report if the VENV is active or not.*
 
-## OS Concepts Demonstrated
 
-- **Shell as user-OS interface**: takes user input and sends actions to OS.
-- **Filesystem navigation**: `cd`, `pwd`, `ls` use Python `os` APIs.
-- **Process execution**: external commands run using `subprocess.run`.
-- **Error handling**: robust handling for invalid paths and command errors.
+## 💻 How To Run
+1. Ensure you have Python 3.x installed.
+2. Open your terminal in this directory.
+3. Activate the VENV (see above).
+4. Run:
+   ```bash
+   python shell.py
+   ```
 
-## Limitations (intentional for simplicity)
+## 🎓 OS Concepts Demonstrated
+- **Modular Design**: Demonstrates how OS components (like shells) are structured into subsystems.
+- **Process Management**: Uses `subprocess` to spawn and manage external system processes.
+- **Filesystem Interface**: Interacts with the OS kernel through `os` and `shutil` APIs.
+- **User Environment**: Retrieves system metadata like hostname, username, and environment variables.
+- **Error Handling**: Implements defensive programming to handle invalid inputs and OS exceptions.
+- **Isolated Environments**: Demonstrates the use of virtual environments (VENV) to maintain system integrity.
 
-- Basic token parsing (`split`) is used.
-- Complex quoting, pipes, and redirection are not implemented.
-- Designed mainly for Windows demo environment.
+
+---
